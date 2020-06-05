@@ -1,0 +1,70 @@
+<canvas width="850" height="1100"></canvas>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+canvas {
+  position: absolute;
+  width: 850px;
+  height: 1100px;
+  border: 0.1rem solid black;
+  cursor: crosshair;
+}
+</style>
+<script>
+let lastX = 0;
+let lastY = 0;
+let socket = io();
+let canvas = document.querySelector("canvas");
+let c_rect = canvas.getBoundingClientRect();
+let ctx = canvas.getContext('2d');
+canvas.setAttribute("width", c_rect.width);
+canvas.setAttribute("height", c_rect.height);
+canvas.addEventListener("mousedown", mouseListener);
+canvas.addEventListener("mouseup", mouseListener);
+socket.on("stroke", (lX, lY, x, y) => {stroke(ctx, c_rect, lX, lY, x, y);});
+
+function mouseListener(ev) {
+  const canvas = document.querySelector("canvas");
+  const c_rect = document.querySelector("canvas").getBoundingClientRect();
+  const ctx = canvas.getContext("2d");
+  if (ev.type == "mousedown") {
+    canvas.addEventListener("mousemove", mouseListener);
+  } else if (ev.type == "mouseup") {
+    canvas.removeEventListener("mousemove", mouseListener);
+    socket.emit("stroke", lastX, lastY, ev.clientX, ev.clientY);
+  } else if (ev.type == "mousemove") {
+    socket.emit("stroke", lastX, lastY, ev.clientX, ev.clientY);
+  }
+  lastX = ev.clientX;
+  lastY = ev.clientY;
+}
+
+let strokeColor = "black";
+// Guidance from https://developer.mozilla.org/en-US/docs/Web/API/Element/mousemove_event
+function stroke(ctx, c_rect, lX, lY, x, y) {
+  ctx.beginPath();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1;
+  ctx.lineCap = "round";
+  ctx.moveTo(lX - c_rect.left, lY - c_rect.top);
+  ctx.lineTo(x - c_rect.left, y - c_rect.top);
+  ctx.stroke();
+  ctx.closePath();
+}
+
+socket.on('image', (arraybuf)=>{
+  var blob = new Blob([arraybuf], {type: "image/png"}); // set proper mime-type
+
+  var domURL = self.URL || self.webkitURL || self,
+      url = domURL.createObjectURL(blob),
+      img = new Image;
+
+  img.onload = function () {
+      ctx.drawImage(img, 0, 0);
+      domURL.revokeObjectURL(url);  // clean up
+      // this = image
+  };
+  img.src = url;
+});
+
+
+</script>

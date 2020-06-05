@@ -1,0 +1,11 @@
+{
+  "name": "HAGSocket",
+  "version": "0.0.1",
+  "description": "Collaborative doodling for digital yearbook signing.",
+  "dependencies": {
+    "canvas": "^2.6.1",
+    "express": "^4.17.1",
+    "nodemon": "^2.0.4",
+    "socket.io": "^2.3.0"
+  }
+}
