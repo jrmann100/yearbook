@@ -105,3 +105,6 @@ dist
 
 # Stupid macOS
 .DS_STORE
+
+# room images
+r*.png

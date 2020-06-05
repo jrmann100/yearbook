@@ -1,12 +1,18 @@
+<h1>Loading...</h1>
 <canvas width="850" height="1100"></canvas>
 <script src="/socket.io/socket.io.js"></script>
 <style>
 canvas {
   position: absolute;
+  top: 0;
+  left: 0;
   width: 850px;
   height: 1100px;
   border: 0.1rem solid black;
   cursor: crosshair;
+  opacity: 0;
+  transition: opacity 0.5s ease-out;
+  background-color: white;
 }
 </style>
 <script>
@@ -21,6 +27,12 @@ canvas.setAttribute("height", c_rect.height);
 canvas.addEventListener("mousedown", mouseListener);
 canvas.addEventListener("mouseup", mouseListener);
 socket.on("stroke", (lX, lY, x, y) => {stroke(ctx, c_rect, lX, lY, x, y);});
+
+roomID = new URLSearchParams(window.location.search).get("room") || prompt("Room ID?")
+setTimeout(()=>{
+  socket.emit("room", roomID);
+  canvas.style.opacity = "1";
+}, 1000);
 
 function mouseListener(ev) {
   const canvas = document.querySelector("canvas");
