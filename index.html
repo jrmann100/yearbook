@@ -1,6 +1,6 @@
 <h1>Loading...</h1>
 <canvas width="850" height="1100"></canvas>
-<script src="/socket.io/socket.io.js"></script>
+<script src="socket.io/socket.io.js"></script>
 <style>
 canvas {
   position: absolute;
@@ -18,7 +18,7 @@ canvas {
 <script>
 let lastX = 0;
 let lastY = 0;
-let socket = io();
+let socket = io(window.location.origin, {path: window.location.pathname + 'socket.io'});
 let canvas = document.querySelector("canvas");
 let c_rect = canvas.getBoundingClientRect();
 let ctx = canvas.getContext('2d');

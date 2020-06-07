@@ -100,6 +100,6 @@ setInterval(()=>{
   });
 }, SAVE_ROOM_INTERVAL);
 
-http.listen(80, () => {
-    console.log("listening on *:80");
+http.listen(8082, () => {
+    console.log("listening on *:8082");
 });
