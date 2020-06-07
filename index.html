@@ -26,9 +26,9 @@ canvas.setAttribute("width", c_rect.width);
 canvas.setAttribute("height", c_rect.height);
 canvas.addEventListener("mousedown", mouseListener);
 canvas.addEventListener("mouseup", mouseListener);
-socket.on("stroke", (lX, lY, x, y) => {stroke(ctx, c_rect, lX, lY, x, y);});
 
 roomID = new URLSearchParams(window.location.search).get("room") || prompt("Room ID?")
+
 setTimeout(()=>{
   socket.emit("room", roomID);
   canvas.style.opacity = "1";
@@ -42,19 +42,31 @@ function mouseListener(ev) {
     canvas.addEventListener("mousemove", mouseListener);
   } else if (ev.type == "mouseup") {
     canvas.removeEventListener("mousemove", mouseListener);
-    socket.emit("stroke", lastX, lastY, ev.clientX, ev.clientY);
-  } else if (ev.type == "mousemove") {
-    socket.emit("stroke", lastX, lastY, ev.clientX, ev.clientY);
+    // We're supposed to stroke here but I don't really want to.
   }
+  if (ev.type == "mousemove" || drawMode == "erase") {
+    if (drawMode == "erase"){
+        socket.emit("erase", {"x": ev.clientX, "y": ev.clientY});
+    } else if (drawMode == "stroke"){
+      socket.emit("stroke", {"lX": lastX, "lY": lastY, "x": ev.clientX, "y": ev.clientY, "color": strokeColor});
+    }
+}
   lastX = ev.clientX;
   lastY = ev.clientY;
 }
 
 let strokeColor = "black";
+let drawMode = "stroke";
+
+// PLACEHOLDER CODE: NEEDS TO BE ASSIGNED TO ACTION
+if (drawMode == "erase"){
+  canvas.style.cursor = `url("data:image/svg+xml,%3Csvg width='20' height='20' xmlns='http://www.w3.org/2000/svg' version='1.1'%3E%3Crect width='100%25' height='100%25' fill='rgba(0,0,0,0.5)'%3E%3C/rect%3E%3C/svg%3E"), auto`
+}
+
 // Guidance from https://developer.mozilla.org/en-US/docs/Web/API/Element/mousemove_event
-function stroke(ctx, c_rect, lX, lY, x, y) {
+function stroke(ctx, c_rect, lX, lY, x, y, color) {
   ctx.beginPath();
-  ctx.strokeStyle = strokeColor;
+  ctx.strokeStyle = color;
   ctx.lineWidth = 1;
   ctx.lineCap = "round";
   ctx.moveTo(lX - c_rect.left, lY - c_rect.top);
@@ -63,19 +75,39 @@ function stroke(ctx, c_rect, lX, lY, x, y) {
   ctx.closePath();
 }
 
-socket.on('image', (arraybuf)=>{
-  var blob = new Blob([arraybuf], {type: "image/png"}); // set proper mime-type
+function erase(ctx, x, y){
+  ctx.clearRect(x, y, 20, 20);
+}
 
-  var domURL = self.URL || self.webkitURL || self,
-      url = domURL.createObjectURL(blob),
-      img = new Image;
+socket.on("room", (resp) => {
+  if (resp.success){
+    console.info(resp.msg);
+  } else {
+    console.error(resp.msg);
+  }
+})
 
-  img.onload = function () {
-      ctx.drawImage(img, 0, 0);
-      domURL.revokeObjectURL(url);  // clean up
-      // this = image
-  };
-  img.src = url;
+socket.on("stroke", (resp) => {if (resp.success){stroke(ctx, c_rect, resp.data.lX, resp.data.lY, resp.data.x, resp.data.y, resp.data.color);} else {console.error(resp.msg)}});
+
+socket.on("erase", (resp) => {if (resp.success){erase(ctx,resp.data.x, resp.data.y);} else {console.error(resp.msg)}});
+
+socket.on('image', (resp)=>{
+  if (resp.success){
+    var blob = new Blob([resp.data], {type: "image/png"});
+
+    var domURL = self.URL || self.webkitURL || self,
+        url = domURL.createObjectURL(blob),
+        img = new Image;
+
+    img.onload = function () {
+        ctx.drawImage(img, 0, 0);
+        domURL.revokeObjectURL(url);  // clean up
+        // this = image
+    };
+    img.src = url;
+  } else {
+    console.error(resp.msg);
+  }
 });
 
 

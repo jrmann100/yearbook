@@ -1,28 +1,28 @@
-var app = require('express')();
-var http = require('http').createServer(app);
-var io = require('socket.io')(http);
+var app = require("express")();
+var http = require("http").createServer(app);
+var io = require("socket.io")(http);
 
 const CANVAS_WIDTH = 850;
 const CANVAS_HEIGHT = 1120;
+const SAVE_ROOM_INTERVAL = 30000;
 
-const { createCanvas, loadImage } = require('canvas');
+const { createCanvas, loadImage } = require("canvas");
 
-const fs = require('fs')
+const fs = require("fs")
 
 function save(roomID){
-    if (rooms[roomID] !== null){
-      const out = fs.createWriteStream(__dirname + '/' + roomID + '.png')
+    if (rooms[roomID]){
+      const out = fs.createWriteStream(__dirname + "/" + roomID + ".png")
       const stream = rooms[roomID][0].createPNGStream()
       stream.pipe(out)
-      out.on('finish', () =>  console.log('save complete.'))
+      out.on("finish", () =>  console.log(`Saved ${roomID}.`));
     }
 }
 
-let strokeColor = "black";
 // Guidance from https://developer.mozilla.org/en-US/docs/Web/API/Element/mousemove_event
-function stroke(ctx, lX, lY, x, y) {
+function stroke(ctx, lX, lY, x, y, color) {
   ctx.beginPath();
-  ctx.strokeStyle = strokeColor;
+  ctx.strokeStyle = color;
   ctx.lineWidth = 1;
   ctx.lineCap = "round";
   ctx.moveTo(lX, lY);
@@ -31,58 +31,75 @@ function stroke(ctx, lX, lY, x, y) {
   ctx.closePath();
 }
 
-app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/index.html');
+function erase(ctx, x, y){
+  ctx.clearRect(x, y, 20, 20);
+}
+
+app.get("/", (req, res) => {
+    res.sendFile(__dirname + "/index.html");
 });
 
-let rooms = {'r0': null, 'r1': null, 'r2': null};
+let rooms = {"r0": null, "r1": null, "r2": null};
 
-io.on('connection', (socket) => {
-    console.log('a user connected');
-    socket.on('room', (id)=>{
+io.on("connection", (socket) => {
+    console.log("+ " + socket.id.substring(0,3));
+    socket.on("room", (id)=>{
       if (rooms.hasOwnProperty(id)){
         socket.join(id);
         socket.roomID = id;
-        if (rooms[socket.roomID] === null){
+        if (!rooms[socket.roomID]){
           // Create a new canvas for this room.
           let newRoomCanvas = createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
-          rooms[socket.roomID] = [newRoomCanvas, newRoomCanvas.getContext('2d')];
-          loadImage(socket.roomID + '.png').then((image) => {
+          rooms[socket.roomID] = [newRoomCanvas, newRoomCanvas.getContext("2d")];
+          loadImage(socket.roomID + ".png").then((image) => {
               rooms[socket.roomID][1].drawImage(image, 0, 0);
-          });
+          }).catch(()=>{console.log(`Error loading image into room ${socket.roomID}: it probably doesn't exist yet.`)});
         }
-        socket.emit('room', "Changed to " + socket.roomID);
+        socket.emit("room", {"success": true, "msg": "Joined room " + socket.roomID});
         rooms[socket.roomID][0].toBuffer(function(err, buf){
-          if (err) throw err;
-          socket.emit('image', buf);
+          if (err) {socket.emit("image", {"success": false, "msg": err});}
+          socket.emit("image", {"success": true, "data": buf});
         });
       } else {
-        socket.emit('room', "Room does not exist.");
+        socket.emit("room", {"success": false, "msg": "Room does not exist."});
       }
     })
 
-    socket.on('disconnect', () => {
-        console.log('user disconnected.');
-        save(socket.roomID);
+    socket.on("disconnect", () => {
+        console.log("- " + socket.id.substring(0,3));
+        if (socket.roomID){
+          save(socket.roomID);
+        }
     });
 
-    socket.on('stroke', (lX, lY, x, y) => {
-        stroke(rooms[socket.roomID][1], lX ,lY, x, y);
-        io.sockets.in(socket.roomID).emit('stroke', lX, lY, x, y);
-    })
+    socket.on("stroke", (data) => {
+        if (socket.roomID == null){
+          socket.emit("stroke", {"success": false, "msg": "You must be connected to a room to draw."});
+          return;
+        }
+        stroke(rooms[socket.roomID][1], data.lX ,data.lY, data.x, data.y, data.color);
+        io.sockets.in(socket.roomID).emit("stroke", {"success": true, "data": {"lX": data.lX, "lY": data.lY, "x": data.x, "y": data.y, "color": data.color}});
+    });
+
+    socket.on("erase", (data) => {
+        if (socket.roomID == null){
+          socket.emit("stroke", {"success": false, "msg": "You must be connected to a room to draw."});
+          return;
+        }
+        erase(rooms[socket.roomID][1], data.x, data.y);
+        io.sockets.in(socket.roomID).emit("erase", {"success": true, "data": {"x": data.x, "y": data.y}});
+    });
 });
 
-// Need to iterate over live rooms.
-// setInterval(()=>{save(canvas);}, 60000);
-
-// process.on("SIGINT", async (code)=>{
-//   console.log("Goodbye! Give me a moment to save though.");
-//   Object.keys(rooms).forEach((roomID)=>{save(roomID)});
-//   http.close();
-//   process.exit(0);
-// })
-// This doesn't work anyways.
+setInterval(()=>{
+  console.log("Performing scheduled saves...");
+  Object.keys(io.sockets.adapter.rooms).forEach(e=>{
+    if (!Object.keys(io.sockets.adapter.sids).includes(e)){
+      save(e);
+    }
+  });
+}, SAVE_ROOM_INTERVAL);
 
 http.listen(80, () => {
-    console.log('listening on *:80');
+    console.log("listening on *:80");
 });
