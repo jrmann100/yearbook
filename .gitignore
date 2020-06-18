@@ -107,4 +107,4 @@ dist
 .DS_STORE
 
 # room images
-r*.png
+*.png

@@ -1,18 +1,47 @@
 <h1>Loading...</h1>
-<canvas width="850" height="1100"></canvas>
+<div id="controls"><input type="color" id="color"><input type="button" value="Switch to Eraser"id="erase">&nbsp;Draw within the dotted lines (scroll to view more of the page).<br>&nbsp;Command Plus/Minus to adjust page zoom.</div>
+<div id="canvaswrapper"><canvas width="850" height="1100"></canvas></div>
 <script src="socket.io/socket.io.js"></script>
 <style>
-canvas {
+#controls {
+    display: flex;
+    align-content: center;
+    font-family: sans-serif;
+}
+
+#controls input {
+    height: 1.5rem;
+}
+
+#canvaswrapper {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 850px;
-  height: 1100px;
+  width: 90vw;
+  height: calc(95vh - 3rem);
+  top: 3rem;
+  left: 5vw;
   border: 0.1rem solid black;
   cursor: crosshair;
   opacity: 0;
   transition: opacity 0.5s ease-out;
   background-color: white;
+  overflow: scroll;
+}
+
+#canvaswrapper canvas {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: 0;
+    border: 0.2rem dashed black;
+}
+
+h1 {
+    position: absolute;
+    left: min(50vw, 50vh);
+    top: min(30vw, 30vh);
+    transform: translate(-50%,-50%);
+    font-family: sans-serif;
 }
 </style>
 <script>
@@ -22,8 +51,8 @@ let socket = io(window.location.origin, {path: window.location.pathname + 'socke
 let canvas = document.querySelector("canvas");
 let c_rect = canvas.getBoundingClientRect();
 let ctx = canvas.getContext('2d');
-canvas.setAttribute("width", c_rect.width);
-canvas.setAttribute("height", c_rect.height);
+//canvas.setAttribute("width", c_rect.width);
+//canvas.setAttribute("height", c_rect.height);
 canvas.addEventListener("mousedown", mouseListener);
 canvas.addEventListener("mouseup", mouseListener);
 
@@ -31,12 +60,13 @@ roomID = new URLSearchParams(window.location.search).get("room") || prompt("Room
 
 setTimeout(()=>{
   socket.emit("room", roomID);
-  canvas.style.opacity = "1";
+  document.querySelector("#canvaswrapper").style.opacity = "1";
 }, 1000);
 
 function mouseListener(ev) {
+  console.log(">", ev.clientX, ev.clientY);
   const canvas = document.querySelector("canvas");
-  const c_rect = document.querySelector("canvas").getBoundingClientRect();
+  c_rect = document.querySelector("canvas").getBoundingClientRect();
   const ctx = canvas.getContext("2d");
   if (ev.type == "mousedown") {
     canvas.addEventListener("mousemove", mouseListener);
@@ -76,14 +106,16 @@ function stroke(ctx, c_rect, lX, lY, x, y, color) {
 }
 
 function erase(ctx, x, y){
-  ctx.clearRect(x, y, 20, 20);
+  console.log("<", x, y);
+  ctx.clearRect(x - c_rect.left, y - c_rect.top, 20, 20);
 }
 
 socket.on("room", (resp) => {
   if (resp.success){
     console.info(resp.msg);
   } else {
-    console.error(resp.msg);
+    alert("Error! " + resp.msg);
+    window.location.reload();
   }
 })
 
@@ -110,5 +142,6 @@ socket.on('image', (resp)=>{
   }
 });
 
-
+document.querySelector("#color").addEventListener("input", (e)=>{strokeColor = e.currentTarget.value;});
+document.querySelector("#erase").addEventListener("click", (e)=>{if (drawMode == "erase"){drawMode = "stroke"; document.querySelector("#canvaswrapper").style.cursor = "crosshair"; e.currentTarget.value = "Switch to Eraser";} else {drawMode = "erase"; document.querySelector("#canvaswrapper").style.cursor = `url("data:image/svg+xml,%3Csvg width='20' height='20' xmlns='http://www.w3.org/2000/svg' version='1.1'%3E%3Crect width='100%25' height='100%25' fill='rgba(0,0,0,0.5)'%3E%3C/rect%3E%3C/svg%3E"), auto`; e.currentTarget.value = "Switch to Pen";}});
 </script>

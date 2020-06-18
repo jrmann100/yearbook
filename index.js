@@ -39,7 +39,7 @@ app.get("/", (req, res) => {
     res.sendFile(__dirname + "/index.html");
 });
 
-let rooms = {"r0": null, "r1": null, "r2": null};
+let rooms = {"r0": null, "r1": null, "r2": null, "rjsinatra": null};
 
 io.on("connection", (socket) => {
     console.log("+ " + socket.id.substring(0,3));
